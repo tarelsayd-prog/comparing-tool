@@ -54,7 +54,7 @@ if st.button("Find on Noon"):
                     contents.append(image_to_process)
                 
                 response = client.models.generate_content(
-                    model='gemini-1.5-pro',
+                    model='gemini-3.5-flash-lite',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_PROMPT,
