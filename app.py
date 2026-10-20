@@ -18,31 +18,30 @@ current_date = datetime.now().strftime("%B %Y")
 
 SYSTEM_PROMPT = f"""
 # Role & Persona
-You are an intelligent, adaptive e-commerce thought partner and product matching specialist. You do not just blindly query databases; you reason through the user's intent, analyze the context of their request, and gently handle any misinformation or ambiguity before finding the exact product match on Noon.com (specifically Noon Egypt). Your tone is helpful, conversational, and grounded.
+You are an intelligent, adaptive e-commerce thought partner and product matching specialist. 
 
 # Core Objective
-Take user inputs (images, Amazon URLs, or text descriptions), identify the exact product, and return a working direct search URL for that product on Noon.com.
+Take user inputs (images, Amazon URLs, or text descriptions), identify the exact product, and return the real, direct product URL on Noon.com (specifically Noon Egypt).
 
 # Instructions & Workflow
 
 **1. Analyze and Reason First**
-- Carefully review the user's input. Extract the brand, model, size, weight, and specific variants (e.g., color, flavor, storage capacity).
-- **Temporal & Factual Awareness:** The current date is {current_date}. You must operate with the knowledge that products released up to this date (such as the Samsung Galaxy S26 series) exist and are actively sold. Gently correct the user if they claim a currently existing product is unreleased.
-- **Independent Verification:** If the user provides an ambiguous description, mentally verify what the product is before attempting to match it.
+- Carefully review the user's input. Extract the brand, model, size, weight, and specific variants.
+- **Temporal Awareness:** The current date is {current_date}. 
 
-**2. Search and Match**
-- Identify the exact product name to look for on Noon.com.
-- Pay strict attention to nuances: 30g vs. 50g packages, 4G vs. 5G models, and exact color codes.
+**2. Live Search for the Exact Link**
+- You MUST use your Google Search capability to find the real product page on Noon Egypt. 
+- Run a search query like: `site:noon.com/egypt-en/ [exact product name]`
+- Locate the actual URL from the search results. Real Noon URLs always contain a specific product ID (e.g., `N12345678A/p/`).
 
 **3. Format the Output**
-- Start your response directly and conversationally. Do not use robotic setups like "Here is the link you requested."
+- Start your response directly and conversationally.
 - List the matched product name clearly.
-- Since you cannot guess Noon's exact randomized product IDs, provide a direct search link to Noon Egypt using the product's exact name. Format it exactly like this: `https://www.noon.com/egypt-en/search/?q=[exact+product+name]` (replace spaces with `+` or `%20`). 
-- Do not bury the link inside Markdown text.
+- Provide the **direct, raw clickable URL** that you found via search. 
+- Do NOT use a Noon search link (like `.../search/?q=...`), and do NOT guess or hallucinate the product ID. If you cannot find the exact product page via live search, state that it is currently unavailable on Noon.
 
 **4. Strict Guardrails**
-- **No Hallucinations:** Never fabricate or guess a direct product URL containing random IDs. Always use the search URL format.
-- **Clarification First:** If critical information is missing from the user's input, ask a brief clarifying question before generating a final solution.
+- **No Hallucinations:** Never fabricate a URL. You must only return URLs that you have verified through live search.
 """
 
 def fetch_amazon_details(url):
@@ -55,11 +54,9 @@ def fetch_amazon_details(url):
         response = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.content, "html.parser")
         
-        # Get Title
         title_tag = soup.find(id="productTitle")
         title = title_tag.get_text(strip=True) if title_tag else "Product title not found"
         
-        # Get Main Image
         image_tag = soup.find(id="landingImage")
         image_url = image_tag.get("src") if image_tag else None
         
@@ -71,7 +68,7 @@ def fetch_amazon_details(url):
 st.set_page_config(page_title="Amazon to Noon Matcher", page_icon="🛒", layout="centered")
 
 st.title("🛒 Amazon to Noon Product Matcher")
-st.write("Upload product images or paste an Amazon link to fetch details and get the direct Noon.com search URL.")
+st.write("Upload product images or paste an Amazon link to fetch details and get the direct Noon.com URL.")
 
 input_method = st.radio("Choose Input Method:", ("Upload Product Images", "Paste Amazon Link"))
 
@@ -87,7 +84,7 @@ if input_method == "Upload Product Images":
             images_to_process.append(img)
             st.image(img, caption=f"Uploaded: {file.name}", use_container_width=True)
             
-        user_prompt = "Find these exact products on Noon Egypt and provide the exact search link for each."
+        user_prompt = "Find these exact products on Noon Egypt and provide the raw direct link for each."
 
 elif input_method == "Paste Amazon Link":
     amazon_link = st.text_input("Paste Amazon URL here:")
@@ -97,7 +94,7 @@ elif input_method == "Paste Amazon Link":
             
             if title:
                 st.write(f"**Fetched Title:** {title}")
-                user_prompt = f"Find the equivalent of this product on Noon Egypt and provide the direct search link. Product Title: {title}"
+                user_prompt = f"Find the equivalent of this product on Noon Egypt and provide the raw direct link. Product Title: {title}"
                 
                 if image_url:
                     img_response = requests.get(image_url)
@@ -106,24 +103,26 @@ elif input_method == "Paste Amazon Link":
                     st.image(img, caption="Fetched Amazon Image", use_container_width=True)
             else:
                 st.warning("Could not fetch details from Amazon. Proceeding with the raw URL...")
-                user_prompt = f"Find the equivalent of this Amazon product on Noon Egypt and provide the search link: {amazon_link}"
+                user_prompt = f"Find the equivalent of this Amazon product on Noon Egypt and provide the direct link: {amazon_link}"
 
 # --- Processing ---
 if st.button("Find on Noon"):
     if not user_prompt:
         st.warning("Please provide an image or a link first.")
     else:
-        with st.spinner("Searching Noon for matches..."):
+        with st.spinner("Searching Noon for exact matches via Google Search..."):
             try:
                 contents = [user_prompt]
                 if images_to_process:
                     contents.extend(images_to_process)
                 
+                # We added tools=[{'google_search': {}}] here to give the AI live internet access!
                 response = client.models.generate_content(
                     model='gemini-3.5-flash-lite',
                     contents=contents,
                     config=types.GenerateContentConfig(
                         system_instruction=SYSTEM_PROMPT,
+                        tools=[{'google_search': {}}] 
                     )
                 )
                 
@@ -135,4 +134,4 @@ if st.button("Find on Noon"):
                 st.error(f"An error occurred: {e}")
 
 st.markdown("---")
-st.markdown("<small>Powered by Streamlit and Google Gemini 3.5 Flash Lite.</small>", unsafe_allow_html=True)
+st.markdown("<small>Powered by Streamlit and Google Gemini 3.5 Flash Lite with Google Search.</small>", unsafe_allow_html=True)
