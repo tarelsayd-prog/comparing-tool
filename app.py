@@ -21,7 +21,7 @@ SYSTEM_PROMPT = f"""
 You are an intelligent, adaptive e-commerce thought partner and product matching specialist. You do not just blindly query databases; you reason through the user's intent, analyze the context of their request, and gently handle any misinformation or ambiguity before finding the exact product match on Noon.com (specifically Noon Egypt). Your tone is helpful, conversational, and grounded.
 
 # Core Objective
-Take user inputs (images, Amazon URLs, or text descriptions), identify the exact product, and return the direct, raw URL for that product on Noon.com.
+Take user inputs (images, Amazon URLs, or text descriptions), identify the exact product, and return a working direct search URL for that product on Noon.com.
 
 # Instructions & Workflow
 
@@ -31,16 +31,17 @@ Take user inputs (images, Amazon URLs, or text descriptions), identify the exact
 - **Independent Verification:** If the user provides an ambiguous description, mentally verify what the product is before attempting to match it.
 
 **2. Search and Match**
-- Locate the identical product on Noon.com matching the exact specifications.
+- Identify the exact product name to look for on Noon.com.
 - Pay strict attention to nuances: 30g vs. 50g packages, 4G vs. 5G models, and exact color codes.
 
 **3. Format the Output**
 - Start your response directly and conversationally. Do not use robotic setups like "Here is the link you requested."
 - List the matched product name clearly.
-- Provide the **direct, raw clickable URL** (e.g., `https://www.noon.com/egypt-en/...`). Do not bury the link inside Markdown text.
+- Since you cannot guess Noon's exact randomized product IDs, provide a direct search link to Noon Egypt using the product's exact name. Format it exactly like this: `https://www.noon.com/egypt-en/search/?q=[exact+product+name]` (replace spaces with `+` or `%20`). 
+- Do not bury the link inside Markdown text.
 
 **4. Strict Guardrails**
-- **No Hallucinations:** Never fabricate or guess a URL. If a product is completely unavailable on Noon, state clearly that it is currently out of stock or not carried by the platform.
+- **No Hallucinations:** Never fabricate or guess a direct product URL containing random IDs. Always use the search URL format.
 - **Clarification First:** If critical information is missing from the user's input, ask a brief clarifying question before generating a final solution.
 """
 
@@ -70,7 +71,7 @@ def fetch_amazon_details(url):
 st.set_page_config(page_title="Amazon to Noon Matcher", page_icon="🛒", layout="centered")
 
 st.title("🛒 Amazon to Noon Product Matcher")
-st.write("Upload product images or paste an Amazon link to fetch details and get the direct Noon.com URL.")
+st.write("Upload product images or paste an Amazon link to fetch details and get the direct Noon.com search URL.")
 
 input_method = st.radio("Choose Input Method:", ("Upload Product Images", "Paste Amazon Link"))
 
@@ -86,7 +87,7 @@ if input_method == "Upload Product Images":
             images_to_process.append(img)
             st.image(img, caption=f"Uploaded: {file.name}", use_container_width=True)
             
-        user_prompt = "Find these exact products on Noon Egypt and provide the raw direct link for each."
+        user_prompt = "Find these exact products on Noon Egypt and provide the exact search link for each."
 
 elif input_method == "Paste Amazon Link":
     amazon_link = st.text_input("Paste Amazon URL here:")
@@ -96,7 +97,7 @@ elif input_method == "Paste Amazon Link":
             
             if title:
                 st.write(f"**Fetched Title:** {title}")
-                user_prompt = f"Find the equivalent of this product on Noon Egypt and provide the raw direct link. Product Title: {title}"
+                user_prompt = f"Find the equivalent of this product on Noon Egypt and provide the direct search link. Product Title: {title}"
                 
                 if image_url:
                     img_response = requests.get(image_url)
@@ -105,7 +106,7 @@ elif input_method == "Paste Amazon Link":
                     st.image(img, caption="Fetched Amazon Image", use_container_width=True)
             else:
                 st.warning("Could not fetch details from Amazon. Proceeding with the raw URL...")
-                user_prompt = f"Find the equivalent of this Amazon product on Noon Egypt and provide the raw direct link: {amazon_link}"
+                user_prompt = f"Find the equivalent of this Amazon product on Noon Egypt and provide the search link: {amazon_link}"
 
 # --- Processing ---
 if st.button("Find on Noon"):
